@@ -69,9 +69,13 @@ def data_generator():
     train_datagen = ImageDataGenerator(
                                 preprocessing_function=applications.resnet50.preprocess_input,
                                 #featurewise_center=True,
-                                shear_range=0.2,
-                                zoom_range=0.2,
-                                horizontal_flip=True)
+                                #rotation_range=30, # 40
+                                shear_range=0.3,
+                                zoom_range=0.3, 
+                                #width_shift_range=0.2, #
+                                #height_shift_range=0.2, #
+                                horizontal_flip=True,
+                                vertical_flip=True) # add agora lembrar de usar
     val_datagen = ImageDataGenerator(
                                 preprocessing_function=applications.resnet50.preprocess_input)#featurewise_center=True)
 
@@ -161,7 +165,7 @@ def run_evaluate_model(model, val_gen, BS):
 
 def run_evaluate_model_2(model, val_gen, BS):
     # make predictions on the validation set
-    print("[INFO] evaluating network into validation set...")
+    print("[INFO] evaluating network into validation set with Classification report...")
     predictions = model.predict(val_gen, batch_size=BS)
 
     # for each image in the testing set we need to find the index of the
@@ -210,14 +214,14 @@ if __name__ == '__main__':
 
     run_evaluate_model_2(model, val_gen, BS)
 
-    print ("Predictions: {}".format(predictions))
+    #print ("Predictions: {}".format(predictions))
 
     print ("Validation Loss: {:.2f}".format(result[0]))
     print ("Validation Accuracy: {:.2f}%".format(result[1] * 100.0))
     
     plotLearningCurves(path_output, history, plot_graph, result)
 
-    model.save(path_save_model + "soybean_disease_detection.h5")
+    #model.save(path_save_model + "soybean_disease_detection.h5")
     
     print ("[INFO] OK training terminated...")
     

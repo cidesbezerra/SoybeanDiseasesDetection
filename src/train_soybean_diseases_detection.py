@@ -3,6 +3,7 @@ import numpy as np
 
 import tensorflow as tf
 
+from keras.models import load_model
 from keras import optimizers, applications
 from keras.callbacks import ReduceLROnPlateau, ModelCheckpoint
 from architecture import Architecture
@@ -20,13 +21,15 @@ def get_args():
         help="path to input dataset")
     ap.add_argument("-ou", "--output", required=True,
         help="path to output")
-    ap.add_argument("-p", "--plot", type=str, default="loss_accuracy.pdf",
+    ap.add_argument("-pl", "--plot", type=str, default="loss_accuracy.pdf",
         help="path to output loss/accuracy plot")
-    ap.add_argument("-m", "--model", type=str, default="soybean_disease_detection.model",
-        help="path to output soybean disease detector model")
+    ap.add_argument("-sm", "--save_model", type=str, default="soybean_disease_detection.model",
+        help="path to output save soybean disease detector model")
+    ap.add_argument("-lm", "--load_model", type=str, default="not",
+        help="Flags: 'not' to train model from scratch. 'yes' to continue from last saved epoch")
     args = vars(ap.parse_args())
     
-    return args["dataset"], args["output"], args["plot"], args["model"]
+    return args["dataset"], args["output"], args["plot"], args["save_model"], args["load_model"]
 
 def load_database(path_dataset, image_size, BS):
 
@@ -67,17 +70,18 @@ def data_generator():
     #train_datagen = ImageDataGenerator(preprocessing_function=keras.applications.resnet50.preprocess_input)
 
     train_datagen = ImageDataGenerator(
-                                preprocessing_function=applications.resnet50.preprocess_input,
+                                #preprocessing_function=applications.resnet50.preprocess_input, # resnet50
+                                preprocessing_function=applications.xception.preprocess_input,
                                 #featurewise_center=True,
                                 #rotation_range=30, # 40
                                 shear_range=0.3,
                                 zoom_range=0.3, 
                                 #width_shift_range=0.2, #
                                 #height_shift_range=0.2, #
-                                horizontal_flip=True,
-                                vertical_flip=True) # add agora lembrar de usar
+                                horizontal_flip=True)
     val_datagen = ImageDataGenerator(
-                                preprocessing_function=applications.resnet50.preprocess_input)#featurewise_center=True)
+                                #preprocessing_function=applications.resnet50.preprocess_input) # resnet50
+                                preprocessing_function=applications.xception.preprocess_input)
 
     # Normalize data with mean values from imagenet dataset
     train_datagen.mean = [123.68, 116.779, 103.939]
@@ -85,7 +89,7 @@ def data_generator():
     
     return train_datagen, val_datagen
 
-def callbacks_scheduler(path_output):
+def callbacks_scheduler(path_save_model):
     # Callbacks for search learning rate and save best model
     my_callbacks = [
                     ReduceLROnPlateau(
@@ -94,10 +98,13 @@ def callbacks_scheduler(path_output):
                                 min_lr=0.0000000001,
                                 verbose=1),
                     ModelCheckpoint(
-                                filepath=path_output + "soybean_disease_detection.h5",
-                                monitor="val_accuracy",
-                                mode="max",
-                                save_best_only=True)]
+                                filepath=path_save_model + "soybean_disease_detection.h5",
+                                monitor="val_loss",
+                                verbose=1,
+                                mode="auto",
+                                save_freq="epoch",
+                                save_best_only=False,
+                                save_weights_only=False)]
     return my_callbacks
 
 # Function to plot the learning curves
@@ -124,23 +131,27 @@ def plotLearningCurves(path_output, history, plot_graph, result):
 
     return
 
-def create_run_train_model(train_gen, val_gen, path_save_model, image_size, my_callbacks, LR, BS, EPOCHS):
+def create_train_model(path_output, image_size, LR):
     
-    model = Architecture.resnet50_transfer_learning(image_size)
+    #model = Architecture.resnet50_tl_ft(image_size)
+    #opt = optimizers.RMSprop(learning_rate=LR) # resnet50
 
-    #opt = optimizers.SGD(learning_rate=LR, momentum=0.9, decay=LR / EPOCHS)
+    model = Architecture.xception_tl_ft(image_size)
+    opt = optimizers.SGD(learning_rate=LR, momentum=0.9, decay=0.94)
+    
     #opt = optimizers.Adam(learning_rate=LR)
-    opt = optimizers.RMSprop(learning_rate=LR)
 
-    
     #model.compile(loss="binary_crossentropy", optimizer=opt, metrics=["accuracy"]) # To binary class problem
     model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy'])
     
-    #model.summary()
-    plot_model(model, to_file=path_save_model + "model_plot.png", show_shapes=True, show_layer_names=True)
+    model.summary()
+    plot_model(model, to_file=path_output + "model_plot.png", show_shapes=True, show_layer_names=True)
 
+    return model
+
+def train_model(model, train_gen, val_gen, my_callbacks, BS, EPOCHS):
     # Training the model
-    print("[INFO] training the model with data augmentation...")
+    print("[INFO] training the model from scratch...")
     history = model.fit(
                         train_gen,
                         validation_data=val_gen,
@@ -148,7 +159,28 @@ def create_run_train_model(train_gen, val_gen, path_save_model, image_size, my_c
                         epochs=EPOCHS,
                         shuffle=True,
                         callbacks=[my_callbacks])
-    return history, model
+
+    return history
+
+def train_saved_model(model, train_gen, val_gen, my_callbacks, BS, EPOCHS_old, EPOCHS_new):
+    # Training the model
+    print("[INFO] training the saved model...")
+    history = model.fit(
+                        train_gen,
+                        validation_data=val_gen,
+                        batch_size=BS,
+                        epochs=EPOCHS_new,
+                        shuffle=True,
+                        initial_epoch=EPOCHS_old,
+                        callbacks=[my_callbacks])
+
+    return history
+
+def load_saved_model(path_save_model):
+    print ("[INFO] loading saved model")
+    model = load_model(path_save_model + "soybean_disease_detection.h5")
+
+    return model
 
 def run_evaluate_model(model, val_gen, BS):
     # make evaluation on the validation set
@@ -191,13 +223,13 @@ def run_evaluate_model_2(model, val_gen, BS):
 
 if __name__ == '__main__':
     
-    path_dataset, path_output, plot_graph, path_save_model = get_args()
+    path_dataset, path_output, plot_graph, path_save_model, flag_load_model = get_args()
     print ("[INFO] Starting...")
 
-    image_size = (224, 224, 3)
-    BS = 128
-    EPOCHS = 15
-    LR = 1e-5
+    image_size = (299, 299, 3)# (224, 224, 3) resnet50
+    BS = 32
+    EPOCHS = 30
+    LR =  0.045 # 1e-5 resnet50
     
     train_gen, val_gen = load_database(path_dataset, image_size, BS)
 
@@ -206,9 +238,17 @@ if __name__ == '__main__':
 
     #print ("val_gen.classes: ", val_gen.classes)
     
-    my_callbacks = callbacks_scheduler(path_output)
-    
-    history, model = create_run_train_model(train_gen, val_gen, path_save_model, image_size, my_callbacks, LR, BS, EPOCHS)
+    my_callbacks = callbacks_scheduler(path_save_model)
+
+    if flag_load_model == "not":
+        model = create_train_model(path_output, image_size, LR)
+        history = train_model(model, train_gen, val_gen, my_callbacks, BS, EPOCHS)
+
+    elif flag_load_model == "yes":
+        model = load_saved_model(path_save_model)
+        EPOCHS_new = 50
+        EPOCHS_old = EPOCHS
+        history = train_saved_model(model, train_gen, val_gen, my_callbacks, BS, EPOCHS_old, EPOCHS_new)
     
     result, predictions = run_evaluate_model(model, val_gen, BS)
 

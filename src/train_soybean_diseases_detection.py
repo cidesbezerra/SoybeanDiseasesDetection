@@ -57,42 +57,47 @@ def data_generator():
     # construct the training image generator for data augmentation
     '''
     train_datagen = ImageDataGenerator(
-                                featurewise_center=True,
+                                rescale=1./255,
                                 rotation_range=40,
-                                zoom_range=0.25,
                                 width_shift_range=0.2,
                                 height_shift_range=0.2,
-                                shear_range=0.15,
-                                horizontal_flip=True,
-                                fill_mode="nearest")#,
-                                #validation_split=0.2)
+                                shear_range=0.2,
+                                zoom_range=0.2,
+                                horizontal_flip=True)
                                 '''
     #train_datagen = ImageDataGenerator(preprocessing_function=keras.applications.resnet50.preprocess_input)
 
     train_datagen = ImageDataGenerator(
                                 #preprocessing_function=applications.resnet50.preprocess_input, # resnet50
-                                preprocessing_function=applications.xception.preprocess_input,
-                                #featurewise_center=True,
-                                #rotation_range=30, # 40
-                                shear_range=0.3,
-                                zoom_range=0.3, 
-                                #width_shift_range=0.2, #
-                                #height_shift_range=0.2, #
+                                #preprocessing_function=applications.xception.preprocess_input, # xception
+                                #preprocessing_function=applications.mobilenet.preprocess_input, # mobilenet
+                                preprocessing_function=applications.inception_v3.preprocess_input,
+                                rotation_range=40,
+                                width_shift_range=0.2,
+                                height_shift_range=0.2,
+                                shear_range=0.2,
+                                zoom_range=0.2,
                                 horizontal_flip=True)
     val_datagen = ImageDataGenerator(
                                 #preprocessing_function=applications.resnet50.preprocess_input) # resnet50
-                                preprocessing_function=applications.xception.preprocess_input)
+                                #preprocessing_function=applications.xception.preprocess_input) # xception
+                                preprocessing_function=applications.inception_v3.preprocess_input, # mobilenet
+                                rotation_range=40,
+                                width_shift_range=0.2,
+                                height_shift_range=0.2,
+                                shear_range=0.2,
+                                zoom_range=0.2,
+                                horizontal_flip=True)
 
     # Normalize data with mean values from imagenet dataset
-    train_datagen.mean = [123.68, 116.779, 103.939]
-    val_datagen.mean = [123.68, 116.779, 103.939]
+    #train_datagen.mean = [123.68, 116.779, 103.939]
+    #val_datagen.mean = [123.68, 116.779, 103.939]
     
     return train_datagen, val_datagen
 
 def callbacks_scheduler(path_save_model):
     # Callbacks for search learning rate and save best model
-    my_callbacks = [
-                    ReduceLROnPlateau(
+    my_callbacks = [ReduceLROnPlateau(
                                 patience=2,
                                 factor=0.3,
                                 min_lr=0.0000000001,
@@ -100,7 +105,7 @@ def callbacks_scheduler(path_save_model):
                     ModelCheckpoint(
                                 filepath=path_save_model + "soybean_disease_detection.h5",
                                 monitor="val_loss",
-                                verbose=1,
+                                verbose=0,
                                 mode="auto",
                                 save_freq="epoch",
                                 save_best_only=False,
@@ -136,15 +141,20 @@ def create_train_model(path_output, image_size, LR):
     #model = Architecture.resnet50_tl_ft(image_size)
     #opt = optimizers.RMSprop(learning_rate=LR) # resnet50
 
-    model = Architecture.xception_tl_ft(image_size)
-    opt = optimizers.SGD(learning_rate=LR, momentum=0.9, decay=0.94)
+    #model = Architecture.xception_tl_ft(image_size)
+    #opt = optimizers.RMSprop(learning_rate=LR)
+    
+    #model = Architecture.mobilenet_tl_ft(image_size)
+    #opt = optimizers.RMSprop(learning_rate=LR)
+    
+    model = Architecture.inseptionv3_tl_ft(image_size)
+    opt = optimizers.RMSprop(learning_rate=LR)
     
     #opt = optimizers.Adam(learning_rate=LR)
 
-    #model.compile(loss="binary_crossentropy", optimizer=opt, metrics=["accuracy"]) # To binary class problem
     model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy'])
     
-    model.summary()
+    #model.summary()
     plot_model(model, to_file=path_output + "model_plot.png", show_shapes=True, show_layer_names=True)
 
     return model
@@ -154,6 +164,7 @@ def train_model(model, train_gen, val_gen, my_callbacks, BS, EPOCHS):
     print("[INFO] training the model from scratch...")
     history = model.fit(
                         train_gen,
+                        #workers=8,
                         validation_data=val_gen,
                         batch_size=BS,
                         epochs=EPOCHS,
@@ -226,10 +237,10 @@ if __name__ == '__main__':
     path_dataset, path_output, plot_graph, path_save_model, flag_load_model = get_args()
     print ("[INFO] Starting...")
 
-    image_size = (299, 299, 3)# (224, 224, 3) resnet50
-    BS = 32
-    EPOCHS = 30
-    LR =  0.045 # 1e-5 resnet50
+    image_size = (299, 299, 3) # (299, 299, 3)# (224, 224, 3) resnet50
+    BS = 128
+    EPOCHS = 20
+    LR = 1e-4  # 1e-5 resnet50 # 0.045
     
     train_gen, val_gen = load_database(path_dataset, image_size, BS)
 

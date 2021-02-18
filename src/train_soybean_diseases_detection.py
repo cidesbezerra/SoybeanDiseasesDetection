@@ -72,22 +72,17 @@ def data_generator():
                                 #preprocessing_function=applications.xception.preprocess_input, # xception
                                 #preprocessing_function=applications.mobilenet.preprocess_input, # mobilenet
                                 preprocessing_function=applications.inception_v3.preprocess_input,
-                                rotation_range=40,
-                                width_shift_range=0.2,
-                                height_shift_range=0.2,
-                                shear_range=0.2,
-                                zoom_range=0.2,
+                                #featurewise_center=True,
+                                #rotation_range=30, # 40
+                                shear_range=0.3,
+                                zoom_range=0.3, 
+                                #width_shift_range=0.2, #
+                                #height_shift_range=0.2, #
                                 horizontal_flip=True)
     val_datagen = ImageDataGenerator(
                                 #preprocessing_function=applications.resnet50.preprocess_input) # resnet50
                                 #preprocessing_function=applications.xception.preprocess_input) # xception
-                                preprocessing_function=applications.inception_v3.preprocess_input, # mobilenet
-                                rotation_range=40,
-                                width_shift_range=0.2,
-                                height_shift_range=0.2,
-                                shear_range=0.2,
-                                zoom_range=0.2,
-                                horizontal_flip=True)
+                                preprocessing_function=applications.inception_v3.preprocess_input) # mobilenet
 
     # Normalize data with mean values from imagenet dataset
     #train_datagen.mean = [123.68, 116.779, 103.939]
@@ -99,7 +94,7 @@ def callbacks_scheduler(path_save_model):
     # Callbacks for search learning rate and save best model
     my_callbacks = [ReduceLROnPlateau(
                                 patience=2,
-                                factor=0.3,
+                                factor=0.2,
                                 min_lr=0.0000000001,
                                 verbose=1),
                     ModelCheckpoint(

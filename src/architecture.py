@@ -97,22 +97,33 @@ class Architecture:
     def inseptionv3_tl_ft(image_size):
         base_model = InceptionV3(input_shape=image_size, include_top=False, weights="imagenet")
         
-        for layer in base_model.layers:#[:143]:
-            layer.trainable = False # False
+        #for layer in base_model.layers:#[:143]:
+        #    layer.trainable = False # False
+        for layer in base_model.layers:
+            if isinstance(layer, BatchNormalization):
+                layer.trainable = True
+        else:
+            layer.trainable = False
         
         x=base_model.output
         #x=BatchNormalization()(x)
         x=GlobalAveragePooling2D()(x)
-        x=Dense(2048,activation='relu', kernel_initializer='he_uniform')(x) #we add dense layers so that the model can learn more complex functions and classify for better results.
+        x=Dense(2048,activation='relu', kernel_initializer='he_uniform')(x) # 2048 we add dense layers so that the model can learn more complex functions and classify for better results.
         x=BatchNormalization()(x)
         x=Dropout(0.2)(x)#2
-        x=Dense(1024,activation='relu', kernel_initializer='he_uniform')(x) #dense layer 2
+        x=Dense(1024,activation='relu', kernel_initializer='he_uniform')(x) # 1024 dense layer 2
         x=BatchNormalization()(x)
         x=Dropout(0.4)(x)#4
-        x=Dense(512,activation='relu', kernel_initializer='he_uniform')(x) #dense layer 3
+        x=Dense(512,activation='relu', kernel_initializer='he_uniform')(x) # 512 dense layer 3
         x=BatchNormalization()(x)
         x=Dropout(0.6)(x)#6
-        x=Dense(256,activation='relu', kernel_initializer='he_uniform')(x) #dense layer 4
+        x=Dense(256,activation='relu', kernel_initializer='he_uniform')(x) #256 dense layer 4 
+        x=BatchNormalization()(x)
+        x=Dropout(0.6)(x)#6
+        x=Dense(128,activation='relu', kernel_initializer='he_uniform')(x) #128 dense layer 5
+        x=BatchNormalization()(x)
+        x=Dropout(0.6)(x)#6
+        x=Dense(64,activation='relu', kernel_initializer='he_uniform')(x) #64 dense layer 6
         x=BatchNormalization()(x)
         x=Dropout(0.6)(x)#6
         preds=Dense(4,activation='softmax')(x) #final layer with softmax activation for N classes

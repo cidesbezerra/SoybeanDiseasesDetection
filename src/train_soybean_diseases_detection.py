@@ -68,10 +68,10 @@ def data_generator():
     #train_datagen = ImageDataGenerator(preprocessing_function=keras.applications.resnet50.preprocess_input)
 
     train_datagen = ImageDataGenerator(
-                                #preprocessing_function=applications.resnet50.preprocess_input, # resnet50
+                                preprocessing_function=applications.resnet50.preprocess_input, # resnet50
                                 #preprocessing_function=applications.xception.preprocess_input, # xception
                                 #preprocessing_function=applications.mobilenet.preprocess_input, # mobilenet
-                                preprocessing_function=applications.inception_v3.preprocess_input,
+                                #preprocessing_function=applications.inception_v3.preprocess_input, # inception_v3
                                 #featurewise_center=True,
                                 #rotation_range=30, # 40
                                 shear_range=0.3,
@@ -80,9 +80,10 @@ def data_generator():
                                 #height_shift_range=0.2, #
                                 horizontal_flip=True)
     val_datagen = ImageDataGenerator(
-                                #preprocessing_function=applications.resnet50.preprocess_input) # resnet50
+                                preprocessing_function=applications.resnet50.preprocess_input) # resnet50
                                 #preprocessing_function=applications.xception.preprocess_input) # xception
-                                preprocessing_function=applications.inception_v3.preprocess_input) # mobilenet
+                                #preprocessing_function=applications.mobilenet.preprocess_input) # mobilenet
+                                #preprocessing_function=applications.inception_v3.preprocess_input) # inception_v3
 
     # Normalize data with mean values from imagenet dataset
     #train_datagen.mean = [123.68, 116.779, 103.939]
@@ -90,7 +91,7 @@ def data_generator():
     
     return train_datagen, val_datagen
 
-def callbacks_scheduler(path_save_model):
+def callbacks_scheduler(path_save_model, plot_graph):
     # Callbacks for search learning rate and save best model
     my_callbacks = [ReduceLROnPlateau(
                                 patience=2,
@@ -98,7 +99,7 @@ def callbacks_scheduler(path_save_model):
                                 min_lr=0.0000000001,
                                 verbose=1),
                     ModelCheckpoint(
-                                filepath=path_save_model + "soybean_disease_detection.h5",
+                                filepath=path_save_model + plot_graph + "_soybean_disease_detection.h5",
                                 monitor="val_loss",
                                 verbose=0,
                                 mode="auto",
@@ -133,8 +134,9 @@ def plotLearningCurves(path_output, history, plot_graph, result):
 
 def create_train_model(path_output, image_size, LR):
     
-    #model = Architecture.resnet50_tl_ft(image_size)
-    #opt = optimizers.RMSprop(learning_rate=LR) # resnet50
+    model = Architecture.resnet50_tl_ft(image_size)
+    opt = optimizers.RMSprop(learning_rate=LR) # resnet50
+    #opt = optimizers.SGD(learning_rate=LR)
 
     #model = Architecture.xception_tl_ft(image_size)
     #opt = optimizers.RMSprop(learning_rate=LR)
@@ -142,12 +144,12 @@ def create_train_model(path_output, image_size, LR):
     #model = Architecture.mobilenet_tl_ft(image_size)
     #opt = optimizers.RMSprop(learning_rate=LR)
     
-    model = Architecture.inseptionv3_tl_ft(image_size)
-    opt = optimizers.RMSprop(learning_rate=LR)
+    #model = Architecture.inseptionv3_tl_ft(image_size)
+    #opt = optimizers.RMSprop(learning_rate=LR)
     
     #opt = optimizers.Adam(learning_rate=LR)
 
-    model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy'])
+    model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy']) # metrics=['accuracy']
     
     #model.summary()
     plot_model(model, to_file=path_output + "model_plot.png", show_shapes=True, show_layer_names=True)
@@ -182,9 +184,9 @@ def train_saved_model(model, train_gen, val_gen, my_callbacks, BS, EPOCHS_old, E
 
     return history
 
-def load_saved_model(path_save_model):
+def load_saved_model(path_save_model, plot_graph):
     print ("[INFO] loading saved model")
-    model = load_model(path_save_model + "soybean_disease_detection.h5")
+    model = load_model(path_save_model + plot_graph + "_soybean_disease_detection.h5")
 
     return model
 
@@ -232,8 +234,8 @@ if __name__ == '__main__':
     path_dataset, path_output, plot_graph, path_save_model, flag_load_model = get_args()
     print ("[INFO] Starting...")
 
-    image_size = (299, 299, 3) # (299, 299, 3)# (224, 224, 3) resnet50
-    BS = 128
+    image_size = (224, 224, 3) # (299, 299, 3) inseptionv3 and xception # (224, 224, 3) resnet50 and mobilenet
+    BS = 128 # 16 to xception # 128 to others
     EPOCHS = 20
     LR = 1e-4  # 1e-5 resnet50 # 0.045
     
@@ -244,14 +246,14 @@ if __name__ == '__main__':
 
     #print ("val_gen.classes: ", val_gen.classes)
     
-    my_callbacks = callbacks_scheduler(path_save_model)
+    my_callbacks = callbacks_scheduler(path_save_model, plot_graph)
 
     if flag_load_model == "not":
         model = create_train_model(path_output, image_size, LR)
         history = train_model(model, train_gen, val_gen, my_callbacks, BS, EPOCHS)
 
     elif flag_load_model == "yes":
-        model = load_saved_model(path_save_model)
+        model = load_saved_model(path_save_model, plot_graph)
         EPOCHS_new = 50
         EPOCHS_old = EPOCHS
         history = train_saved_model(model, train_gen, val_gen, my_callbacks, BS, EPOCHS_old, EPOCHS_new)
@@ -267,7 +269,7 @@ if __name__ == '__main__':
     
     plotLearningCurves(path_output, history, plot_graph, result)
 
-    #model.save(path_save_model + "soybean_disease_detection.h5")
+    model.save(path_save_model + plot_graph + "_soybean_disease_detection.h5")
     
     print ("[INFO] OK training terminated...")
     
